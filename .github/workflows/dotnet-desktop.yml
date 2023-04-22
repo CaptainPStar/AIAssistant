@@ -42,14 +42,14 @@ jobs:
     - name: Build
       run: dotnet build -c debug --no-restore
       
-    - name: Install zip
-      uses: montudor/action-zip@v1
+    #- name: Install zip
+     # uses: montudor/action-zip@v1
       
-    - name: Zip output
-      run: zip -qq -r aiassistant.zip bin/debug/net7.0-windows
+    #- name: Zip output
+     # run: zip -qq -r aiassistant.zip bin/debug/net7.0-windows
       
     - name: Upload Build Artifact
       uses: actions/upload-artifact@v2
       with:
         name: aiassistant
-        path: /home/runner/work/Playground/Playground/src/AIAssistant/bin/Debug/aiassistant.zip
+        path: /home/runner/work/Playground/Playground/src/AIAssistant/bin/Debug/net7.0-windows
