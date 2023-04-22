@@ -1,0 +1,75 @@
+﻿<metro:MetroWindow x:Class="EVA.MainWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+        xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+        xmlns:metro="http://metro.mahapps.com/winfx/xaml/controls"
+        xmlns:iconPacks="http://metro.mahapps.com/winfx/xaml/iconpacks"
+        xmlns:local="clr-namespace:EVA"
+        mc:Ignorable="d"
+        Title="EVA (Electronic Virtual Assistant)" Height="950" Width="800">
+    <Window.Resources>
+        <local:BooleanToVisibilityConverter x:Key="BooleanToVisibilityConverter" />
+        <local:BooleanToVisibilityCollapsedConverter x:Key="BooleanToVisibilityCollapsedConverter" />
+    </Window.Resources>
+    <Grid Margin="10">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="*"/>
+            <RowDefinition Height="Auto"/>
+        </Grid.RowDefinitions>
+        <ListBox x:Name="ChatListBox" ItemsSource="{Binding Messages}" Grid.Row="0" BorderThickness="0" Background="Transparent">
+            <ListBox.ContextMenu>
+                <ContextMenu>
+                    <MenuItem Header="Copy" Click="CopyMenuItem_Click" InputGestureText="Ctrl+C">
+                        <MenuItem.InputBindings>
+                            <KeyBinding Key="C" Modifiers="Control" Command="ApplicationCommands.Copy" />
+                        </MenuItem.InputBindings>
+                    </MenuItem>
+                </ContextMenu>
+            </ListBox.ContextMenu>
+            <ListBox.Resources>
+                <Style TargetType="ListBoxItem">
+                    <Setter Property="HorizontalContentAlignment" Value="Stretch"/>
+                    <Setter Property="Padding" Value="0"/>
+                </Style>
+                <DataTemplate DataType="{x:Type local:UserMessage}">
+                    <Grid Margin="5">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*"/>
+                            <ColumnDefinition Width="Auto"/>
+                        </Grid.ColumnDefinitions>
+                        <TextBlock Grid.Column="1" Text="{Binding Text}" TextWrapping="Wrap" MaxWidth="400" Margin="10" Background="DodgerBlue" Foreground="White" FontWeight="SemiBold" Padding="10" FontSize="14"/>
+                    </Grid>
+                </DataTemplate>
+                        <DataTemplate DataType="{x:Type local:AssistantMessage}">
+                            <Grid Margin="5">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="Auto"/>
+                                    <ColumnDefinition Width="*"/>
+                                </Grid.ColumnDefinitions>
+                                <TextBlock Grid.Column="0" Text="{Binding Text}" TextWrapping="Wrap" MaxWidth="400" Margin="10" Background="DarkGray" Foreground="White" FontWeight="SemiBold" Padding="10" FontSize="14"/>
+                            </Grid>
+                        </DataTemplate>
+
+                        <DataTemplate DataType="{x:Type local:SystemMessage}">
+                            <TextBlock Text="{Binding Text}" TextWrapping="Wrap" MaxWidth="400" Margin="5" Foreground="Gray" FontStyle="Italic" FontSize="12"/>
+                        </DataTemplate>
+                <DataTemplate DataType="{x:Type local:Processing}">
+                    <Grid>
+                        <iconPacks:PackIconFontAwesome Kind="CogSolid" Spin="True" HorizontalAlignment="Center" VerticalAlignment="Center" />
+                    </Grid>
+                </DataTemplate>
+            </ListBox.Resources>
+        </ListBox>
+        <StackPanel Grid.Row="1" Orientation="Horizontal" Margin="0,10,0,0">
+            <TextBox x:Name="UserInputTextBox" Width="500"  TextWrapping="Wrap" AcceptsReturn="True">What is Echinococcus shiquicus?</TextBox>
+            <Button x:Name="SendButton" Content="Send" Width="80" Click="SendButton_Click" Visibility="{Binding IsProcessing, Converter={StaticResource BooleanToVisibilityCollapsedConverter}}" />
+            <Button x:Name="AbortButton" Content="Abort" Width="80" Click="AbortButton_Click" Background="Red" Visibility="{Binding IsProcessing, Converter={StaticResource BooleanToVisibilityConverter}}" />
+            <Label>Tokens:</Label>
+            <Label Content="{Binding Tokens}" />
+            <Label Content="/" />
+            <Label Content="{Binding Cost}" />
+        </StackPanel>
+    </Grid>
+
+</metro:MetroWindow>
