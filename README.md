@@ -12,6 +12,8 @@ The AI assistant was designed with expandability in mind, and it is my hope that
 - Ability to complete tasks such as answering questions, searching the web, and performing calculations
 - Easy to add new functions by using the command class.
 
+![image](https://user-images.githubusercontent.com/5654543/233810615-71caec2c-7113-4094-833d-580d74605359.png)
+
 ## Installation
 1. Clone the repository
 2. Open the solution file in Visual Studio
