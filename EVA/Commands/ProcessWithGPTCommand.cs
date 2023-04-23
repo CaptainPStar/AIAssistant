@@ -50,7 +50,7 @@ namespace EVA.Commands
 
         public override async Task Execute()
         {
-            var result = await Context.openAIApi.Chat.CreateChatCompletionAsync(Prompt);
+            var result = await Context.OpenAIApi.Chat.CreateChatCompletionAsync(Prompt);
             Context.Tokens += result.Usage.TotalTokens;
             Result = result.Choices[0].Message.Content;
         }

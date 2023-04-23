@@ -39,7 +39,8 @@ namespace EVA
     public class AssistantMessage : Message { }
 
     public class SystemMessage : Message { }
-
+    public class ErrorMessage : Message { }
+    public class ThinkingMessage : Message { }
     public class Processing : Message { }
 
 }

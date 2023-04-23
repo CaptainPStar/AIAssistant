@@ -57,15 +57,18 @@ namespace EVA
     /// </summary>
     public partial class MainWindow : MetroWindow
     {
-        public Context Context { get; set; }
+        public MainWindowView View { get; set; }
 
         public MainWindow()
         {
             InitializeComponent();
             Config cfg = Config.LoadConfig();
-            Context = new Context(cfg);
-            this.DataContext = Context;
-            Context.Messages.CollectionChanged += Messages_CollectionChanged;
+
+            AgentContext context = new AgentContext(cfg);
+
+            View = new MainWindowView(context);
+            this.DataContext = View;
+            View.Messages.CollectionChanged += Messages_CollectionChanged;
         }
         private async void SendButton_Click(object sender, RoutedEventArgs e)
         {
@@ -73,17 +76,12 @@ namespace EVA
             if (string.IsNullOrEmpty(userInput)) return;
 
             //ChatListBox.Items.Add(new UserMessage { Text = "User: "+userInput });
-            Context.AddMessage(Context.Role.User, userInput);
+            View.AddMessage(Role.User, userInput);
+
+            View.AgentContext.HandleUserRequestAsync(userInput);
+
             UserInputTextBox.Clear();
 
-          
-
-            //ChatListBox.Items.Add(new SystemMessage { Text = $"Action: {jsonResponse.ToString()}"});
-
-            // Perform requested actions and update the chat
-            // Example:
-            // string response = ExecuteAction(jsonResponse);
-            // ChatListBox.Items.Add(new AssistantMessage { Text = response });
         }
         private void Messages_CollectionChanged(object sender, System.Collections.Specialized.NotifyCollectionChangedEventArgs e)
         {

@@ -6,6 +6,7 @@
         xmlns:metro="http://metro.mahapps.com/winfx/xaml/controls"
         xmlns:iconPacks="http://metro.mahapps.com/winfx/xaml/iconpacks"
         xmlns:local="clr-namespace:EVA"
+        xmlns:controls="clr-namespace:EVA.Controls"
         mc:Ignorable="d"
         Title="EVA (Electronic Virtual Assistant)" Height="950" Width="800">
     <Window.Resources>
@@ -57,6 +58,20 @@
                 <DataTemplate DataType="{x:Type local:Processing}">
                     <Grid>
                         <iconPacks:PackIconFontAwesome Kind="CogSolid" Spin="True" HorizontalAlignment="Center" VerticalAlignment="Center" />
+                    </Grid>
+                </DataTemplate>
+                <DataTemplate DataType="{x:Type local:ErrorMessage}">
+                    <controls:HyperlinkTextBlock controls:HyperlinkTextBlock.CustomText="{Binding Text}" TextWrapping="Wrap" MaxWidth="400" Margin="5" Foreground="Red" FontStyle="Italic" FontSize="12" />
+                </DataTemplate>
+
+                <DataTemplate DataType="{x:Type local:ThinkingMessage}">
+                    <Grid Margin="5">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="Auto"/>
+                            <ColumnDefinition Width="*"/>
+                        </Grid.ColumnDefinitions>
+                        <iconPacks:PackIconFontAwesome Grid.Column="0" Kind="LightbulbSolid" HorizontalAlignment="Left" VerticalAlignment="Center" />
+                        <TextBlock Grid.Column="1" Text="{Binding Text}" TextWrapping="Wrap" MaxWidth="400" Margin="10" FontStyle="Italic" FontSize="12"/>
                     </Grid>
                 </DataTemplate>
             </ListBox.Resources>

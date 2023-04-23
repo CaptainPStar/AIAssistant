@@ -29,6 +29,7 @@ using System.Threading.Tasks;
 
 namespace EVA
 {
+    using Microsoft.Extensions.Configuration;
     using Newtonsoft.Json;
     using System.IO;
 
@@ -36,13 +37,14 @@ namespace EVA
     {
         public string OpenAIAccessToken { get; set; }
         public bool RefinePromptsWithGPT { get; set; }
-
+        public bool PlanAhead { get; set; }
         private static readonly string ConfigFilePath = "config.json";
-
+        public string ConfigFile { get { return Path.GetFullPath(ConfigFilePath); } } 
         public Config()
         {
             OpenAIAccessToken = "your_default_openai_access_token";
             RefinePromptsWithGPT = false;
+            PlanAhead = false;
         }
 
         public static Config LoadConfig()

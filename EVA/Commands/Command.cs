@@ -35,7 +35,7 @@ namespace EVA.Commands
     {
         public string CommandName { get; set; }
         public string Description { get; set; }
-        public Context Context { get; set; } = null;
+        public AgentContext Context { get; set; } = null;
         public Dictionary<string, object> CustomProperties { get; set; } = new Dictionary<string, object>();
         
         public string Result = string.Empty;

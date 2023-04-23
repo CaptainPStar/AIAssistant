@@ -61,7 +61,7 @@ namespace EVA.Commands
                 if (Summarize)
                 {
                     var prompt = $"Please summarize the following text:\n{fileContent}";
-                    var result = await Context.openAIApi.Chat.CreateChatCompletionAsync(prompt);
+                    var result = await Context.OpenAIApi.Chat.CreateChatCompletionAsync(prompt);
                     Context.Tokens += result.Usage.TotalTokens;
                     Result = result.Choices[0].Message.Content;
                 }

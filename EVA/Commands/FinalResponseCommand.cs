@@ -51,7 +51,7 @@ namespace EVA.Commands
 
         public override Task Execute()
         {
-            //Context.Messages.Add(new AssistantMessage { Text = "EVA:\n" + Text });
+            //View.Messages.Add(new AssistantMessage { Text = "EVA:\n" + Text });
             return null;
 
         }
