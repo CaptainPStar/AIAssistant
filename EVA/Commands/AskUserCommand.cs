@@ -55,7 +55,7 @@ namespace EVA.Commands
         {
             return Task.Factory.StartNew(() =>
             {
-                Context.SendMessageToUI(Role.AI, "AIDA:\n" + Question);
+                Context.SendMessageToUI(Role.AI, Question);
             });
         }
         public override string GetResult(string originalPrompt)

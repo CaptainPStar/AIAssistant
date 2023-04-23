@@ -78,8 +78,7 @@
         </ListBox>
         <StackPanel Grid.Row="1" Orientation="Horizontal" Margin="0,10,0,0">
             <TextBox x:Name="UserInputTextBox" Width="500"  TextWrapping="Wrap" AcceptsReturn="True">What is Echinococcus shiquicus?</TextBox>
-            <Button x:Name="SendButton" Content="Send" Width="80" Click="SendButton_Click" Visibility="{Binding IsProcessing, Converter={StaticResource BooleanToVisibilityCollapsedConverter}}" />
-            <Button x:Name="AbortButton" Content="Abort" Width="80" Click="AbortButton_Click" Background="Red" Visibility="{Binding IsProcessing, Converter={StaticResource BooleanToVisibilityConverter}}" />
+            <Button x:Name="SendButton" Content="Send" Width="80" Click="SendButton_Click" />
             <Label>Tokens:</Label>
             <Label Content="{Binding Tokens}" />
             <Label Content="/" />

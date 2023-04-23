@@ -48,6 +48,7 @@ using System.Speech.Synthesis;
 using EVA.Commands;
 using Newtonsoft.Json.Linq;
 using System.Globalization;
+using System.Threading;
 
 namespace EVA
 {
@@ -61,6 +62,13 @@ namespace EVA
 
         public MainWindow()
         {
+            // Set the default culture to InvariantCulture, workaround wor Weaviate Client
+            CultureInfo.DefaultThreadCurrentCulture = CultureInfo.InvariantCulture;
+            CultureInfo.DefaultThreadCurrentUICulture = CultureInfo.InvariantCulture;
+            Thread.CurrentThread.CurrentCulture = CultureInfo.InvariantCulture;
+            Thread.CurrentThread.CurrentUICulture = CultureInfo.InvariantCulture;
+
+
             InitializeComponent();
             Config cfg = Config.LoadConfig();
 

@@ -13,6 +13,22 @@ using System.Collections.ObjectModel;
 using System.ComponentModel;
 using System.Collections.Concurrent;
 using System.Security.Authentication;
+using System.Diagnostics;
+using System.IO;
+using IO.Milvus.Client;
+using Flurl.Http;
+using SearchPioneer.Weaviate.Client;
+using Newtonsoft.Json;
+using Newtonsoft.Json.Serialization;
+using EVA.Weaviate;
+using Flurl.Http.Configuration;
+using System.Globalization;
+using GraphQL.Client.Http;
+using GraphQL.Client.Abstractions;
+using System.Data;
+using GraphQL;
+using System.Net.Http.Headers;
+using System.Net.Http;
 
 namespace EVA
 {
@@ -32,7 +48,7 @@ namespace EVA
         public Config Config { get; private set; }
         public List<string> StepsTaken { get; private set; } = new List<string>();
         public List<Command> PlannedCommands { get; private set; } = new List<Command>();
-
+        public WeaviateClient Database { private set; get; } = null;
         public string UserRequest { set; get; } = string.Empty;
 
         private static readonly NLog.Logger Logger = NLog.LogManager.GetCurrentClassLogger();
@@ -65,6 +81,8 @@ namespace EVA
             CommandTypes.Add((new WriteLocalFileCommand()).CommandName, typeof(WriteLocalFileCommand));
             CommandTypes.Add((new CalculateExpressionCommand()).CommandName, typeof(CalculateExpressionCommand));
 
+
+
         }
         public async Task<string> AnalyzeInputWithGPT4Async(string prompt)
         {
@@ -74,8 +92,23 @@ namespace EVA
         }
         public async Task HandleUserRequestAsync(string userRequest)
         {
+            if (Config.UseMemory && Database == null)
+            {
+                SendMessageToUI(Role.System, "Using Memory-Feature. Spinning up Weaviate Vector Database...");
+                var flurlClient = new FlurlClient();
+                Database = new WeaviateClient(new SearchPioneer.Weaviate.Client.Config("http", "localhost:8080"), flurlClient);
+                var meta = Database.Misc.Meta();
+                //Console.WriteLine(meta.Error != null ? meta.Error.Message : meta.Result.Version);
+                string weaviateVersion = meta.Error != null ? meta.Error.Message : meta.Result.Version;
+                SendMessageToUI(Role.System, $"Weaviate Version {weaviateVersion} found.");
+                //client.query.aggregate(< ClassName >).with_meta_count().do ()
+
+
+                //await SaveAsMemoryAsync("Request by the user: " + UserRequest);
+
+            }
             //We are already processing a request so this is additional info from the user
-            if (!string.IsNullOrWhiteSpace(UserRequest))
+            if (!string.IsNullOrEmpty(UserRequest))
             {
                 OnNewUserMessage(userRequest);
                 return;
@@ -90,7 +123,8 @@ namespace EVA
             try
             {
                 jsonResponse = await SubconsciousnessActionAsync();
-            } catch (AuthenticationException ex)
+            }
+            catch (AuthenticationException ex)
             {
                 SendMessageToUI(Role.Error, $"Error:\n\"{ex.Message}\"\n\nDid you forget to add your API Key to \"{Config.ConfigFile}\"?");
                 return;
@@ -101,7 +135,8 @@ namespace EVA
             command.Context = this;
 
 
-            SendMessageToUI(Role.System, "Subconscious Command: " + command.GetPrompt());
+            SendMessageToUI(Role.Thinking, "Subconscious Command: " + command.GetPrompt());
+
             // Check if the command is the final response
             if (command is FinalResponseCommand finalResponse)
             {
@@ -109,9 +144,11 @@ namespace EVA
                 //Messages.Add(new AssistantMessage { Text = finalResponse.Text });
                 SendMessageToUI(Role.AI, finalResponse.Text);
 
+
                 //Reset
                 UserRequest = string.Empty;
                 StepsTaken.Clear();
+                SendMessageToUI(Role.System, "Request concluded.");
 
                 return;
             }
@@ -147,10 +184,16 @@ namespace EVA
 
         public async Task<string> SubconsciousnessActionAsync()
         {
-
+            string additionalKnowledge = string.Empty;
+            
+           
             string prompt = "";
             prompt = "As part of an AI assistant it is your task to selects the most appropriate programmatic command from a list of possible commands based on a useriput and the AIs steps to solve the task so far. Depending on the command fill in all the necessary parameters of the command based on the userinput.";
-            prompt += "Available commands:" + "\n";
+            if (Config.UseMemory)
+            {
+                prompt += "You are also assistent by a persistent memory that might recall earlier UserRequests and the processed responses.\n";
+            }
+                prompt += "Available commands:" + "\n";
             foreach (var a in CommandTypes)
             {
                 var cmd = (Command)Activator.CreateInstance(a.Value);
@@ -159,8 +202,37 @@ namespace EVA
             prompt += "Respond only in the JSON format that can be parsed with JSON.parse of the selected action. Only use actions from the provided list! Fill in the template \"{\"action\":\"NameofActionfromList\",... other parameter specified in the list based on the useriput}\"";
 
             prompt += $"User request:\n\"{UserRequest}\"\n";
-            prompt += "\nSteps and tasks already done:\n";
-            if(StepsTaken.Count == 0)
+
+            if (Config.UseMemory)
+            {
+                // Create a Memory object
+
+                string memoryLookup = "";
+                memoryLookup += $"Original user Request: {UserRequest}\n";
+                memoryLookup += $"Steps taken by AI assistant:";
+                foreach(var s in StepsTaken)
+                {
+                    memoryLookup += $"{s}\n";
+                }
+                var mems = await FindSimilarMemoriesAsync(memoryLookup);
+                if(mems.Count > 0)
+                {
+                    prompt += $"You remember {mems.Count} information from earlier tasks and conversations:";
+                    int c = 1;
+                    foreach (var m in mems)
+                    {
+                        prompt += $"Memory {c}:\nKeywords: {String.Join(", ", m.Keywords)}\nSummary: {m.Summary}\nText: {m.Text}\n\n";
+                        c++;
+
+                    }
+                    prompt += "If this information already answers the users input, give the final answer to the user.";
+                }
+
+                //var r = result.Result.Data;
+            }
+
+            prompt += "\nSteps and tasks already taken:\n";
+            if (StepsTaken.Count == 0)
                 prompt += "None\n";
             foreach (var s in StepsTaken)
                 prompt += s + "\n";
@@ -231,7 +303,7 @@ namespace EVA
 
             if (commandName != null && CommandTypes.TryGetValue(commandName, out Type commandType))
             {
-                var command = (Command)JsonSerializer.Deserialize(jsonResponse, commandType);
+                var command = (Command)System.Text.Json.JsonSerializer.Deserialize(jsonResponse, commandType);
 
                 // Populate CustomProperties
                 foreach (var property in json.Properties())
@@ -255,7 +327,7 @@ namespace EVA
             NewUserMessage?.Invoke(this, userMessage);
             StepsTaken.Add("The user wrote in the chat: " + userMessage);
         }
-      
+
 
         /* private async Task<string> ProcessAdditionalInputAsync(string additionalInput)
          {
@@ -273,6 +345,77 @@ namespace EVA
         private async Task UpdatePlannedCommandsAsync(string userRequest, List<string> intermediateResults)
         {
             // ... method body to update PlannedCommands based on user input and intermediate results ...
+        }
+        public async Task<List<Memory>> FindSimilarMemoriesAsync(string text)
+        {
+            //var embedding = await OpenAIApi.Embeddings.GetEmbeddingsAsync(UserRequest);
+            var embedding = await CreateEmbeddingVector(text);
+            //FindSimilarMemoriesAsync(embedding);
+            var request = new GraphGetRequest();
+            //request.NearVector = new NearVector() { Vector = embedding };
+            request.Class = "Memory";
+            request.NearVector = new NearVector() { Vector = embedding, Certainty = 0.85f };
+            request.Fields = new Field[] { "summary","text","keywords" };
+            request.Limit = 3;
+            var memorySearch = await Database.Graph.GetAsync(request);
+
+            var memoryResponse = System.Text.Json.JsonSerializer.Deserialize<GraphQLMemoryResponse>(memorySearch.Result.Data);
+
+            
+            return memoryResponse.Get.Memory.ToList();
+
+        }
+        public async Task SaveAsMemoryAsync(string text)
+        {
+            var summary = await CreateSummary(text);
+            var embedding = await OpenAIApi.Embeddings.GetEmbeddingsAsync(summary);
+            var keywords = await GenerateKeywords(text);
+
+            // Serialize Memory object to JSON
+            var obj = new CreateObjectRequest("Memory");
+            obj.Vector = embedding;
+            obj.Properties = new Dictionary<string, object> { { "summary", summary }, { "text", text }, { "keywords" , keywords } };
+            var dbResult = await Database.Data.CreateAsync(obj);
+
+
+        }
+            public async Task<List<string>> GenerateKeywords(string text)
+        {
+
+            string keywordExtractionPrompt = $"Extract the main keywords from the following text and return a comma seperated list only: \"{text}\"";
+            var result = await OpenAIApi.Chat.CreateChatCompletionAsync(keywordExtractionPrompt);
+            Tokens += result.Usage.TotalTokens;
+
+            List<string> keywords = result.Choices[0].Message.Content.Split(',').ToList();
+
+            return keywords;
+        }
+        public async Task<string> CreateSummary(string text)
+        {
+
+            string extractionPrompt = $"Your task is to extract relevant information from the following prompt or result in a manner that it can be easily used for generating embedding vectors for data relevant data storage and retrieval from a vector database: \"{text}\"";
+            var result = await OpenAIApi.Chat.CreateChatCompletionAsync(extractionPrompt);
+            Tokens += result.Usage.TotalTokens;
+           
+            return result.Choices[0].Message.Content;
+        }
+
+        public async Task<float[]> CreateEmbeddingVector(string text)
+        {
+
+            string extractionPrompt = await CreateSummary(text);
+            var embedding = await OpenAIApi.Embeddings.GetEmbeddingsAsync(extractionPrompt);
+            return embedding;
+        }
+        
+        public class GraphQLMemoryResponse
+        {
+            public GetObject Get { get; set; }
+
+            public class GetObject
+            {
+                public Memory[] Memory { get; set; }
+            }
         }
     }
 }
