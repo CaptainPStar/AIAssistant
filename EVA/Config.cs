@@ -83,6 +83,10 @@ namespace EVA
         [Description("Whether to allow the AI assitant to read and write files on the local harddrive.")]
         public bool UseFileIO { get; set; }
 
+        [JsonProperty("allow_command_prompt")]
+        [IncludeInConfig]
+        [Description("Whether to allow the AI assitant to issue commands in the window command prompt.")]
+        public bool AllowCMDAccess { get; set; }
         private static readonly string ConfigFilePath = "config.json";
         [IncludeInConfig(false)]
         public static string ConfigFile { get { return Path.GetFullPath(ConfigFilePath); } } 
@@ -94,6 +98,7 @@ namespace EVA
             UseMemory = false;
             UseAzure= false;
             UseFileIO = false;
+            AllowCMDAccess = false;
         }
 
         public static Config LoadConfig()

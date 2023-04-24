@@ -30,6 +30,7 @@ using GraphQL;
 using System.Net.Http.Headers;
 using System.Net.Http;
 using ControlzEx.Standard;
+using System.Speech.Synthesis;
 
 namespace EVA
 {
@@ -52,8 +53,11 @@ namespace EVA
         public bool IsProcessing { get; private set; } = false;
         public Config Config { get; private set; }
         public List<string> StepsTaken { get; private set; } = new List<string>();
+        public List<string> StepsPlanned { get; private set; } = new List<string>();
+        private TaskBreakdownPlanner Planner { get; set; }
         public List<Command> PlannedCommands { get; private set; } = new List<Command>();
         public WeaviateClient Database { private set; get; } = null;
+        public List<string> AbilitiesPrompt { get; set; } = new List<string>();
         public string UserRequest { set; get; } = string.Empty;
 
         private static readonly NLog.Logger Logger = NLog.LogManager.GetCurrentClassLogger();
@@ -114,10 +118,20 @@ namespace EVA
                 CommandTypes.Add((new ReadLocalFileCommand()).CommandName, typeof(ReadLocalFileCommand));
                 CommandTypes.Add((new WriteLocalFileCommand()).CommandName, typeof(WriteLocalFileCommand));
             }
-
+            if(Config.AllowCMDAccess)
+            {
+                CommandTypes.Add((new RunWindowsCommandPromptCommand()).CommandName, typeof(RunWindowsCommandPromptCommand));
+            }
             CommandTypes.Add((new CalculateExpressionCommand()).CommandName, typeof(CalculateExpressionCommand));
 
+            foreach (var a in CommandTypes)
+            {
+                var cmd = (Command)Activator.CreateInstance(a.Value);
+                AbilitiesPrompt.Add(cmd.Description + ": " + cmd.GetPrompt());
+            }
 
+            if(Config.PlanAhead)
+                Planner = new TaskBreakdownPlanner(this, AbilitiesPrompt);
 
         }
         public async Task<string> AnalyzeInputWithGPT4Async(string prompt)
@@ -137,10 +151,7 @@ namespace EVA
                 //Console.WriteLine(meta.Error != null ? meta.Error.Message : meta.Result.Version);
                 string weaviateVersion = meta.Error != null ? meta.Error.Message : meta.Result.Version;
                 SendMessageToUI(Role.System, $"Weaviate Version {weaviateVersion} found.");
-                //client.query.aggregate(< ClassName >).with_meta_count().do ()
-
-
-                //await SaveAsMemoryAsync("Request by the user: " + UserRequest);
+               
 
             }
             //We are already processing a request so this is additional info from the user
@@ -148,6 +159,14 @@ namespace EVA
             {
                 OnNewUserMessage(userRequest);
                 return;
+            } else
+            {
+                //Initial Planning:
+                if (Config.PlanAhead)
+                {
+                    StepsPlanned = await Planner.CreateHighLevelBreakdown(userRequest);
+                    SendMessageToUI(Role.System, $"Planned steps:{String.Join("\n", StepsPlanned)}");
+                }
             }
             UserRequest = userRequest;
             await ProcessTask();
@@ -167,7 +186,20 @@ namespace EVA
             }
 
             // Deserialize the command
-            var command = DeserializeCommand(jsonResponse);
+            Command command = null;
+            try
+            {
+                command = DeserializeCommand(jsonResponse);
+
+            } catch (Exception ex)
+            {
+                SendMessageToUI(Role.Error, $"Error:\n\"{ex.Message}\"\n\nUnable to parse GPTs JSON response.");
+                StepsTaken.Add($"The last step could not be executed because the generated JSON to decide which command to run could not be parsed. The instruction you generated: {jsonResponse}\nError: {ex.Message}\nPlease try again but this time make sure your response is valid JSON and can be decoded with JObject.Parse.");
+
+                // Continue the process recursively until a final response is obtained
+                await ProcessTask();
+                return;
+            };
             command.Context = this;
 
 
@@ -184,6 +216,7 @@ namespace EVA
                 //Reset
                 UserRequest = string.Empty;
                 StepsTaken.Clear();
+                StepsPlanned.Clear();
                 SendMessageToUI(Role.System, "Request concluded.");
 
                 return;
@@ -221,21 +254,18 @@ namespace EVA
         public async Task<string> SubconsciousnessActionAsync()
         {
             string additionalKnowledge = string.Empty;
-            
-           
+
             string prompt = "";
             prompt = "As part of an AI assistant it is your task to selects the most appropriate programmatic command from a list of possible commands based on a useriput and the AIs steps to solve the task so far. Depending on the command fill in all the necessary parameters of the command based on the userinput.";
+         
+
             if (Config.UseMemory)
             {
                 prompt += "You are also assistent by a persistent memory that might recall earlier UserRequests and the processed responses.\n";
             }
-                prompt += "Available commands:" + "\n";
-            foreach (var a in CommandTypes)
-            {
-                var cmd = (Command)Activator.CreateInstance(a.Value);
-                prompt += cmd.Description + ": " + cmd.GetPrompt() + "\n";
-            }
-            prompt += "Respond only in the JSON format that can be parsed with JSON.parse of the selected action. Only use actions from the provided list! Fill in the template \"{\"action\":\"NameofActionfromList\",... other parameter specified in the list based on the useriput}\"";
+                prompt += "Available commands and abilities:" + "\n";
+                prompt += String.Join('\n', AbilitiesPrompt) + "\n"; ;
+                prompt += "Respond only in the JSON format that can be parsed with JSON.parse of the selected action. Only use actions from the provided list! Fill in the template \"{\"action\":\"NameofActionfromList\",... other parameter specified in the list based on the useriput}\"";
 
             prompt += $"User request:\n\"{UserRequest}\"\n";
 
@@ -267,6 +297,11 @@ namespace EVA
                 //var r = result.Result.Data;
             }
 
+            if (Config.PlanAhead)
+            {
+                prompt += "Here is a high-level breakdown of the steps needed to fulfill the user inquiry:\n";
+                prompt += String.Join("\n", StepsPlanned) + "\n";
+            }
             prompt += "\nSteps and tasks already taken:\n";
             if (StepsTaken.Count == 0)
                 prompt += "None\n";
@@ -283,6 +318,14 @@ namespace EVA
             //ProcessingMessage(false);
 
             Tokens += result.Usage.TotalTokens;
+
+            //Revise plan
+            if (Config.PlanAhead)
+            {
+                await Planner.RevisePlan(UserRequest, StepsPlanned, StepsTaken);
+                SendMessageToUI(Role.System, $"New plan :{String.Join("\n", StepsPlanned)}");
+            }
+
             return result.Choices[0].Message.Content;
 
         }
