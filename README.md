@@ -35,5 +35,7 @@ Contributions to AI-Assistant are welcome and encouraged! If you would like to c
 4. Push your changes to your fork
 5. Create a pull request to merge your changes into the main repository
 
+If you make a contribution you agree that this project (including your contribution) may become licensed under MIT or Apache 2.0 license in the future.
+
 ## License
 This project is released under the GPL-3.0 license. See `LICENSE.md` for more information.
