@@ -80,9 +80,7 @@
             <TextBox x:Name="UserInputTextBox" Width="500"  TextWrapping="Wrap" AcceptsReturn="True">What is Echinococcus shiquicus?</TextBox>
             <Button x:Name="SendButton" Content="Send" Width="80" Click="SendButton_Click" />
             <Label>Tokens:</Label>
-            <Label Content="{Binding Tokens}" />
-            <Label Content="/" />
-            <Label Content="{Binding Cost}" />
+            <Label Content="{Binding AgentContext.Tokens}" />
         </StackPanel>
     </Grid>
 

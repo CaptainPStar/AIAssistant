@@ -34,10 +34,14 @@ using ControlzEx.Standard;
 namespace EVA
 {
     public enum Role { User, AI, Thinking, System , Error}
-    public class AgentContext : INotifyPropertyChanged
+    public partial class AgentContext : INotifyPropertyChanged
     {
-        // Add properties for Tokens and Cost
+ 
         public event PropertyChangedEventHandler PropertyChanged;
+        protected void OnPropertyChanged(string propertyName)
+        {
+            PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(propertyName));
+        }
 
         public readonly OpenAIAPI OpenAIApi;
         public readonly Conversation chat;
@@ -61,9 +65,18 @@ namespace EVA
                 return Math.Round(((Tokens / 1000.0) * 0.2), 1).ToString() + " Cent";
             }
         }
-        public int Tokens { get; set; } = 0;
+        private int _tokens = 0;
+        //public int Tokens { get; set; } = 0;
 
         public Action<Role, string> MessageReceivedCallback { get; set; }
+        public int Tokens {
+            get {
+                return _tokens;
+                }
+            set { 
+                _tokens = value; OnPropertyChanged("Tokens");
+                } 
+        }
 
         public AgentContext(Config config)
         {
@@ -430,8 +443,8 @@ namespace EVA
             var embedding = await OpenAIApi.Embeddings.GetEmbeddingsAsync(extractionPrompt);
             return embedding;
         }
-        
-        public class GraphQLMemoryResponse
+
+         public class GraphQLMemoryResponse
         {
             public GetObject Get { get; set; }
 

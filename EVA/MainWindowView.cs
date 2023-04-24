@@ -11,8 +11,14 @@ namespace EVA
     public class MainWindowView : INotifyPropertyChanged
     {
         public event PropertyChangedEventHandler PropertyChanged;
+        protected void OnPropertyChanged(string propertyName)
+        {
+            PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(propertyName));
+        }
+
+
         public Action<Role,string> MessageReceivedCallback { get; set; }
-        public int Tokens { get {  return AgentContext.Tokens; } }
+        
         public ObservableCollection<Message> Messages { get; } = new ObservableCollection<Message>();
 
         private string _userRequest;

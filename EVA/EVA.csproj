@@ -5,10 +5,18 @@
     <TargetFramework>net7.0-windows</TargetFramework>
     <Nullable>enable</Nullable>
     <UseWPF>true</UseWPF>
+    <PropertyChangedAnalyzerConfiguration>
+      <IsCodeGeneratorDisabled>false</IsCodeGeneratorDisabled>
+      <EventInvokerName>OnPropertyChanged</EventInvokerName>
+    </PropertyChangedAnalyzerConfiguration>
   </PropertyGroup>
 
   <ItemGroup>
     <PackageReference Include="AI.Dev.OpenAI.GPT" Version="1.0.2" />
+    <PackageReference Include="Fody" Version="6.7.0">
+      <PrivateAssets>all</PrivateAssets>
+      <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
+    </PackageReference>
     <PackageReference Include="GraphQL" Version="7.4.1" />
     <PackageReference Include="GraphQL.Client" Version="6.0.0" />
     <PackageReference Include="GraphQL.Client.Abstractions" Version="6.0.0" />
