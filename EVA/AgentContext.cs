@@ -94,10 +94,14 @@ namespace EVA
             CommandTypes.Add((new AskWikipediaCommand()).CommandName, typeof(AskWikipediaCommand));
             CommandTypes.Add((new FinalResponseCommand()).CommandName, typeof(FinalResponseCommand));
             CommandTypes.Add((new ProcessWithGPTCommand()).CommandName, typeof(ProcessWithGPTCommand));
-            CommandTypes.Add((new VoiceOutputCommand()).CommandName, typeof(VoiceOutputCommand));
-            CommandTypes.Add((new ListLocalFilesCommand()).CommandName, typeof(ListLocalFilesCommand));
-            CommandTypes.Add((new ReadLocalFileCommand()).CommandName, typeof(ReadLocalFileCommand));
-            CommandTypes.Add((new WriteLocalFileCommand()).CommandName, typeof(WriteLocalFileCommand));
+            //CommandTypes.Add((new VoiceOutputCommand()).CommandName, typeof(VoiceOutputCommand));
+            if (Config.UseFileIO)
+            {
+                CommandTypes.Add((new ListLocalFilesCommand()).CommandName, typeof(ListLocalFilesCommand));
+                CommandTypes.Add((new ReadLocalFileCommand()).CommandName, typeof(ReadLocalFileCommand));
+                CommandTypes.Add((new WriteLocalFileCommand()).CommandName, typeof(WriteLocalFileCommand));
+            }
+
             CommandTypes.Add((new CalculateExpressionCommand()).CommandName, typeof(CalculateExpressionCommand));
 
 

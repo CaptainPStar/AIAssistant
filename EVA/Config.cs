@@ -78,7 +78,11 @@ namespace EVA
         [Description("Whether to use memory (vector database Milvus) for generating responses. You need docker installed for this to work.")]
         public bool UseMemory { get; set; }
 
-  
+        [JsonProperty("use_fileaccess")]
+        [IncludeInConfig]
+        [Description("Whether to allow the AI assitant to read and write files on the local harddrive.")]
+        public bool UseFileIO { get; set; }
+
         private static readonly string ConfigFilePath = "config.json";
         [IncludeInConfig(false)]
         public static string ConfigFile { get { return Path.GetFullPath(ConfigFilePath); } } 
@@ -89,6 +93,7 @@ namespace EVA
             PlanAhead = false;
             UseMemory = false;
             UseAzure= false;
+            UseFileIO = false;
         }
 
         public static Config LoadConfig()
