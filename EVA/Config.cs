@@ -43,6 +43,26 @@ namespace EVA
         [Description("Your OpenAI API access token.")]
         public string OpenAIAccessToken { get; set; }
 
+        [JsonProperty("use_azure")]
+        [IncludeInConfig]
+        [Description("Should Azure OpenAI API be used instead of OpenAI.")]
+        public bool UseAzure { get; set; }
+
+        [JsonProperty("azure_openai_key")]
+        [IncludeInConfig]
+        [Description("Your Azure OpenAI API key.")]
+        public string AzureOpenAIAPIKey { get; set; }
+
+        [JsonProperty("azure_openai_resource")]
+        [IncludeInConfig]
+        [Description("Your Azure OpenAI API resource")]
+        public string AzureOpenAIAPIResource { get; set; }
+
+        [JsonProperty("azure_openai_deploymentid")]
+        [IncludeInConfig]
+        [Description("Your Azure OpenAI API Deployment ID.")]
+        public string AzureOpenAIAPIDeploymentID { get; set; }
+
         [JsonProperty("refine_prompts_with_gpt")]
         [IncludeInConfig]
         [Description("Whether to refine prompts using GPT before generating a response.")]
@@ -68,6 +88,7 @@ namespace EVA
             RefinePromptsWithGPT = false;
             PlanAhead = false;
             UseMemory = false;
+            UseAzure= false;
         }
 
         public static Config LoadConfig()

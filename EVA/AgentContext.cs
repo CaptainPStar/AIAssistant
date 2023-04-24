@@ -29,6 +29,7 @@ using System.Data;
 using GraphQL;
 using System.Net.Http.Headers;
 using System.Net.Http;
+using ControlzEx.Standard;
 
 namespace EVA
 {
@@ -68,8 +69,26 @@ namespace EVA
         {
             this.Config = config;
 
-            OpenAIApi = new OpenAIAPI(Config.OpenAIAccessToken);
-            chat = OpenAIApi.Chat.CreateConversation();
+            if (Config.UseAzure)
+            {
+                try
+                {
+                    OpenAIApi = OpenAIAPI.ForAzure($"{Config.AzureOpenAIAPIResource}", Config.AzureOpenAIAPIDeploymentID, Config.AzureOpenAIAPIKey);
+                    OpenAIApi.ApiVersion = "2023-03-15-preview"; // needed to access chat endpoint on Azure
+                   // var model = OpenAIApi.Models.RetrieveModelDetailsAsync(Config.AzureOpenAIAPIDeploymentID).GetAwaiter().GetResult();
+                } catch (Exception ex) {
+                    SendMessageToUI(Role.Error, $"Error connecting to Azure Endpoint:\n{ex.Message}");
+                }
+            }
+            else
+            {
+                OpenAIApi = new OpenAIAPI(Config.OpenAIAccessToken);
+            }
+
+            //OpenAIAPI.ForAzure("YourResourceName", "deploymentId", "api-key");
+            //api.ApiVersion = "2023-03-15-preview"; // needed to access chat endpoint on Azure
+
+            //chat = OpenAIApi.Chat.CreateConversation();
 
             CommandTypes.Add((new AskUserCommand()).CommandName, typeof(AskUserCommand));
             CommandTypes.Add((new AskWikipediaCommand()).CommandName, typeof(AskWikipediaCommand));
