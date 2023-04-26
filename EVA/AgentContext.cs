@@ -320,11 +320,11 @@ namespace EVA
             Tokens += result.Usage.TotalTokens;
 
             //Revise plan
-            if (Config.PlanAhead)
+           /* if (Config.PlanAhead)
             {
                 await Planner.RevisePlan(UserRequest, StepsPlanned, StepsTaken);
                 SendMessageToUI(Role.System, $"New plan :{String.Join("\n", StepsPlanned)}");
-            }
+            }*/
 
             return result.Choices[0].Message.Content;
 
