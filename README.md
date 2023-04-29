@@ -13,6 +13,7 @@ The AI assistant was designed with expandability in mind, and it is my hope that
 - Easy to add new functions by using the command class.
 
 ![image](https://user-images.githubusercontent.com/5654543/233810615-71caec2c-7113-4094-833d-580d74605359.png)
+![image](https://user-images.githubusercontent.com/5654543/235301025-18d57352-3485-40e8-825b-537858635d81.png)
 
 ## Installation
 1. Clone the repository
