@@ -30,16 +30,16 @@ using System.Threading.Tasks;
 
 namespace EVA.Commands
 {
-    public class FinalResponseCommand : Command
+    public class FinalResponseCommand : ICommand
     {
         public string Text
         {
-            get => CustomProperties.ContainsKey("text") ? CustomProperties["text"].ToString() : null;
-            set => CustomProperties["text"] = value;
+            get => CustomProperties.ContainsKey("Text") ? CustomProperties["Text"].ToString() : null;
+            set => CustomProperties["Text"] = value;
         }
         public FinalResponseCommand()
         {
-            CommandName = "respond";
+            CommandName = "Respond";
             Description = "When several commands are executed, the AI can decide to give a final response or text to the user. The conversation is resetted.";
             Text = "A respond to a users request.";
         }

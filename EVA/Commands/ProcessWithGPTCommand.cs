@@ -32,12 +32,12 @@ using static System.Net.Mime.MediaTypeNames;
 
 namespace EVA.Commands
 {
-    public class ProcessWithGPTCommand : Command
+    public class ProcessWithGPTCommand : ICommand
     {
         public string Prompt
         {
-            get => CustomProperties.ContainsKey("prompt") ? CustomProperties["prompt"].ToString() : null;
-            set => CustomProperties["prompt"] = value;
+            get => CustomProperties.ContainsKey("Prompt") ? CustomProperties["Prompt"].ToString() : null;
+            set => CustomProperties["Prompt"] = value;
         }
 
         public ProcessWithGPTCommand()

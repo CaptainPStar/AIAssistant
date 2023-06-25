@@ -31,24 +31,34 @@ using System.Threading.Tasks;
 
 namespace EVA.Commands
 {
-    public abstract class Command
+    public abstract class ICommand
     {
         public string CommandName { get; set; }
         public string Description { get; set; }
         public AgentContext Context { get; set; } = null;
+        public bool EnabledByDefault { get; set; } = true;
         public Dictionary<string, object> CustomProperties { get; set; } = new Dictionary<string, object>();
         
         public string Result = string.Empty;
 
         public string GetPrompt() {
-            string prompt = $"{{\"action\":\"{CommandName}\"";
+            string prompt = $"{{\"functionName\":\"{CommandName}\"";
+            prompt += $", \"parameters\":[";
+            bool firstParameter = true;
             foreach (var k in CustomProperties)
             {
                 string valueString;
 
+                if (!firstParameter)
+                {
+                    prompt += $",";
+                } else
+                {
+                    firstParameter = false;
+                }
                 if (k.Value is bool)
                 {
-                    valueString = k.Value.ToString().ToLowerInvariant();
+                    valueString = k.Value.ToString();
                 }
                 else if (k.Value is string)
                 {
@@ -59,10 +69,10 @@ namespace EVA.Commands
                     valueString = k.Value.ToString();
                 }
 
-                prompt += $",\"{k.Key}\":{valueString}";
+                prompt += $"\"{k.Key}\":{valueString}";
             }
-            prompt += $"}}";
-            return prompt ;
+            prompt += $"]}}";
+            return prompt;
         }
         public abstract Task Execute();
         public abstract string GetResult(string originalPrompt);

@@ -8,12 +8,12 @@ using System.Text;
 
 namespace EVA.Commands
 {
-    public class RunWindowsCommandPromptCommand : Command
+    public class RunWindowsCommandPromptCommand : ICommand
     {
         public string Command
         {
-            get => CustomProperties.ContainsKey("command") ? CustomProperties["command"].ToString() : null;
-            set => CustomProperties["command"] = value;
+            get => CustomProperties.ContainsKey("Command") ? CustomProperties["Command"].ToString() : null;
+            set => CustomProperties["Command"] = value;
         }
 
         public RunWindowsCommandPromptCommand()
@@ -21,6 +21,7 @@ namespace EVA.Commands
             CommandName = "RunWindowsCommandPrompt";
             Description = "Run a command in the Windows command prompt and get the result. Specify the command to execute.";
             Command = "eg ipconfig";
+            EnabledByDefault = false;
         }
 
         public override async Task Execute()

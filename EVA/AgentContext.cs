@@ -15,29 +15,30 @@ using System.Collections.Concurrent;
 using System.Security.Authentication;
 using System.Diagnostics;
 using System.IO;
-using IO.Milvus.Client;
-using Flurl.Http;
-using SearchPioneer.Weaviate.Client;
+
 using Newtonsoft.Json;
 using Newtonsoft.Json.Serialization;
-using EVA.Weaviate;
-using Flurl.Http.Configuration;
+
 using System.Globalization;
-using GraphQL.Client.Http;
-using GraphQL.Client.Abstractions;
+
 using System.Data;
-using GraphQL;
+
 using System.Net.Http.Headers;
 using System.Net.Http;
 using ControlzEx.Standard;
 using System.Speech.Synthesis;
+using OpenAI_API.Completions;
+using OpenAI_API.Models;
+using System.Security.Policy;
+using System.Windows.Controls.Primitives;
+using System.Windows.Documents;
 
 namespace EVA
 {
-    public enum Role { User, AI, Thinking, System , Error}
+    public enum Role { User, AI, Thinking, System, Error }
     public partial class AgentContext : INotifyPropertyChanged
     {
- 
+
         public event PropertyChangedEventHandler PropertyChanged;
         protected void OnPropertyChanged(string propertyName)
         {
@@ -47,6 +48,8 @@ namespace EVA
         public readonly OpenAIAPI OpenAIApi;
         public readonly Conversation chat;
         private List<OpenAI_API.Models.Model> models;
+
+        public CommandFactory CommandFactory { private set; get; }
         public ObservableCollection<Message> Messages { get; } = new ObservableCollection<Message>();
         private Dictionary<string, Type> CommandTypes { get; } = new Dictionary<string, Type>();
         public bool HasActiveConversation { get; private set; } = false;
@@ -55,8 +58,7 @@ namespace EVA
         public List<string> StepsTaken { get; private set; } = new List<string>();
         public List<string> StepsPlanned { get; private set; } = new List<string>();
         private TaskBreakdownPlanner Planner { get; set; }
-        public List<Command> PlannedCommands { get; private set; } = new List<Command>();
-        public WeaviateClient Database { private set; get; } = null;
+        public List<ICommand> PlannedCommands { get; private set; } = new List<ICommand>();
         public List<string> AbilitiesPrompt { get; set; } = new List<string>();
         public string UserRequest { set; get; } = string.Empty;
 
@@ -76,10 +78,10 @@ namespace EVA
         public int Tokens {
             get {
                 return _tokens;
-                }
-            set { 
+            }
+            set {
                 _tokens = value; OnPropertyChanged("Tokens");
-                } 
+            }
         }
 
         public AgentContext(Config config)
@@ -92,7 +94,7 @@ namespace EVA
                 {
                     OpenAIApi = OpenAIAPI.ForAzure($"{Config.AzureOpenAIAPIResource}", Config.AzureOpenAIAPIDeploymentID, Config.AzureOpenAIAPIKey);
                     OpenAIApi.ApiVersion = "2023-03-15-preview"; // needed to access chat endpoint on Azure
-                   // var model = OpenAIApi.Models.RetrieveModelDetailsAsync(Config.AzureOpenAIAPIDeploymentID).GetAwaiter().GetResult();
+                                                                 // var model = OpenAIApi.Models.RetrieveModelDetailsAsync(Config.AzureOpenAIAPIDeploymentID).GetAwaiter().GetResult();
                 } catch (Exception ex) {
                     SendMessageToUI(Role.Error, $"Error connecting to Azure Endpoint:\n{ex.Message}");
                 }
@@ -106,52 +108,54 @@ namespace EVA
             //api.ApiVersion = "2023-03-15-preview"; // needed to access chat endpoint on Azure
 
             //chat = OpenAIApi.Chat.CreateConversation();
+            CommandFactory = new CommandFactory();
 
-            CommandTypes.Add((new AskUserCommand()).CommandName, typeof(AskUserCommand));
-            CommandTypes.Add((new AskWikipediaCommand()).CommandName, typeof(AskWikipediaCommand));
-            CommandTypes.Add((new FinalResponseCommand()).CommandName, typeof(FinalResponseCommand));
-            CommandTypes.Add((new ProcessWithGPTCommand()).CommandName, typeof(ProcessWithGPTCommand));
-            //CommandTypes.Add((new VoiceOutputCommand()).CommandName, typeof(VoiceOutputCommand));
+            CommandFactory.RegisterCommand(typeof(AskUserCommand));
+            CommandFactory.RegisterCommand(typeof(AskWikipediaCommand));
+            CommandFactory.RegisterCommand(typeof(FinalResponseCommand));
+            CommandFactory.RegisterCommand(typeof(ProcessWithGPTCommand));
+            CommandFactory.RegisterCommand(typeof(BrowseURLCommand));
+
             if (Config.UseFileIO)
             {
-                CommandTypes.Add((new ListLocalFilesCommand()).CommandName, typeof(ListLocalFilesCommand));
-                CommandTypes.Add((new ReadLocalFileCommand()).CommandName, typeof(ReadLocalFileCommand));
-                CommandTypes.Add((new WriteLocalFileCommand()).CommandName, typeof(WriteLocalFileCommand));
-            }
-            if(Config.AllowCMDAccess)
-            {
-                CommandTypes.Add((new RunWindowsCommandPromptCommand()).CommandName, typeof(RunWindowsCommandPromptCommand));
-            }
-            CommandTypes.Add((new CalculateExpressionCommand()).CommandName, typeof(CalculateExpressionCommand));
+                CommandFactory.RegisterCommand(typeof(ListFilesCommand));
+                CommandFactory.RegisterCommand(typeof(SummarizeFileCommand));
 
-            foreach (var a in CommandTypes)
-            {
-                var cmd = (Command)Activator.CreateInstance(a.Value);
-                AbilitiesPrompt.Add(cmd.Description + ": " + cmd.GetPrompt());
+                //CommandFactory.RegisterCommand(typeof(ReadLocalFileCommand));
+                //CommandFactory.RegisterCommand(typeof(WriteLocalFileCommand));
             }
 
-            if(Config.PlanAhead)
+            if (Config.AllowCMDAccess)
+            {
+                CommandFactory.RegisterCommand(typeof(RunWindowsCommandPromptCommand));
+            }
+
+            CommandFactory.RegisterCommand(typeof(CalculateExpressionCommand));
+
+          
+
+            if (Config.PlanAhead)
                 Planner = new TaskBreakdownPlanner(this, AbilitiesPrompt);
 
         }
         public async Task<string> AnalyzeInputWithGPT4Async(string prompt)
         {
-            var result = await OpenAIApi.Chat.CreateChatCompletionAsync(prompt);
+            var result = await OpenAIApi.Completions.CreateCompletionAsync(new CompletionRequest(prompt, model: Model.GPT4, temperature: 0.1));
+
             Tokens += result.Usage.TotalTokens;
-            return result.Choices[0].Message.Content;
+            return result.Completions[0].Text;
         }
         public async Task HandleUserRequestAsync(string userRequest)
         {
-            if (Config.UseMemory && Database == null)
+            if (Config.UseMemory)
             {
-                SendMessageToUI(Role.System, "Using Memory-Feature. Spinning up Weaviate Vector Database...");
-                var flurlClient = new FlurlClient();
-                Database = new WeaviateClient(new SearchPioneer.Weaviate.Client.Config("http", "localhost:8080"), flurlClient);
-                var meta = Database.Misc.Meta();
-                //Console.WriteLine(meta.Error != null ? meta.Error.Message : meta.Result.Version);
-                string weaviateVersion = meta.Error != null ? meta.Error.Message : meta.Result.Version;
-                SendMessageToUI(Role.System, $"Weaviate Version {weaviateVersion} found.");
+                //SendMessageToUI(Role.System, "Using Memory-Feature. Spinning up Weaviate Vector Database...");
+                //var flurlClient = new FlurlClient();
                
+                //Console.WriteLine(meta.Error != null ? meta.Error.Message : meta.Result.Version);
+                
+                //SendMessageToUI(Role.System, $"Weaviate Version {weaviateVersion} found.");
+
 
             }
             //We are already processing a request so this is additional info from the user
@@ -165,7 +169,7 @@ namespace EVA
                 if (Config.PlanAhead)
                 {
                     StepsPlanned = await Planner.CreateHighLevelBreakdown(userRequest);
-                    SendMessageToUI(Role.System, $"Planned steps:{String.Join("\n", StepsPlanned)}");
+                    SendMessageToUI(Role.System, $"Planned steps: {String.Join("\n", StepsPlanned)}");
                 }
             }
             UserRequest = userRequest;
@@ -186,10 +190,10 @@ namespace EVA
             }
 
             // Deserialize the command
-            Command command = null;
+            ICommand command = null;
             try
             {
-                command = DeserializeCommand(jsonResponse);
+                command = CommandFactory.CreateCommand(jsonResponse);
 
             } catch (Exception ex)
             {
@@ -256,71 +260,53 @@ namespace EVA
             string additionalKnowledge = string.Empty;
 
             string prompt = "";
-            prompt = "As part of an AI assistant it is your task to selects the most appropriate programmatic command from a list of possible commands based on a useriput and the AIs steps to solve the task so far. Depending on the command fill in all the necessary parameters of the command based on the userinput.";
-         
-
-            if (Config.UseMemory)
-            {
-                prompt += "You are also assistent by a persistent memory that might recall earlier UserRequests and the processed responses.\n";
-            }
-                prompt += "Available commands and abilities:" + "\n";
-                prompt += String.Join('\n', AbilitiesPrompt) + "\n"; ;
-                prompt += "Respond only in the JSON format that can be parsed with JSON.parse of the selected action. Only use actions from the provided list! Fill in the template \"{\"action\":\"NameofActionfromList\",... other parameter specified in the list based on the useriput}\"";
-
-            prompt += $"User request:\n\"{UserRequest}\"\n";
-
-            if (Config.UseMemory)
-            {
-                // Create a Memory object
-
-                string memoryLookup = "";
-                memoryLookup += $"Original user Request: {UserRequest}\n";
-                memoryLookup += $"Steps taken by AI assistant:";
-                foreach(var s in StepsTaken)
-                {
-                    memoryLookup += $"{s}\n";
-                }
-                var mems = await FindSimilarMemoriesAsync(memoryLookup);
-                if(mems.Count > 0)
-                {
-                    prompt += $"You remember {mems.Count} information from earlier tasks and conversations:";
-                    int c = 1;
-                    foreach (var m in mems)
-                    {
-                        prompt += $"Memory {c}:\nKeywords: {String.Join(", ", m.Keywords)}\nSummary: {m.Summary}\nText: {m.Text}\n\n";
-                        c++;
-
-                    }
-                    prompt += "If this information already answers the users input, give the final answer to the user.";
-                }
-
-                //var r = result.Result.Data;
-            }
-
+            var Abilities = "List of Available Skills and Functions:" + CommandFactory.CommandList();
+            var JTBD = string.Empty;
             if (Config.PlanAhead)
-            {
-                prompt += "Here is a high-level breakdown of the steps needed to fulfill the user inquiry:\n";
-                prompt += String.Join("\n", StepsPlanned) + "\n";
-            }
-            prompt += "\nSteps and tasks already taken:\n";
-            if (StepsTaken.Count == 0)
-                prompt += "None\n";
-            foreach (var s in StepsTaken)
-                prompt += s + "\n";
-            prompt += "If the user request can be answered with this information, give a final response with the \"respond\" command. Otherwise try another command. Avoid loops like endlessly checking the same wikipedia article. Make sure the output is in JSON format like specified in the command list.";
+                JTBD = "High-Level Jobs-to-be-Done: "+ String.Join("\n", StepsPlanned) + "\n";
+            var AbilityHistory = string.Empty;
+            if(StepsTaken.Count>0)
+                AbilityHistory = " Skills / Functions Executed and Their Results: "+ String.Join("\n", StepsTaken) + "\n";
+            prompt = $@"As an AI chatbot backend, you are responsible for processing user requests and not directly interacting with the frontend user. Based on the information provided, please choose a suitable function, method or skill from the list of available skills and functions to process the user's request. You can also include additional steps if necessary.
+
+                User Request: {UserRequest}
+                {JTBD}
+                {Abilities}
+                {AbilityHistory}
+
+                Select the appropriate function or skill with the required parameters by providing a JSON formatted message that can be parsed by C# .NET. Your response should follow this format:
+                {{
+                 ""functionName"": ""chosenFunction"",
+                ""parameters"": {{
+                   ""parameter1"": ""value1"",
+                    ""parameter2"": ""value2"",...
+                  }}
+                }} ";
+            
+            
             //AddMessage(Role.System,"Subconsciousness:\n" + prompt);
 
             // Refine the prompt by checking for loops, false assumptions, and improving the focus on the user's goal
             //string refinedPrompt = await RefinePromptAsync(userInput, StepsByAI, prompt);
 
             //ProcessingMessage(true);
-            var result = await OpenAIApi.Chat.CreateChatCompletionAsync(prompt);
+            var request = new ChatRequest();
+            var result = await OpenAIApi.Chat.CreateChatCompletionAsync(new ChatRequest()
+            {
+                Model = Model.GPT4,
+                Temperature = 0.1,
+                Messages = new ChatMessage[] {
+                    new ChatMessage(ChatMessageRole.System, prompt)
+                }
+              });
+
+            //var result = await OpenAIApi.Completions.CreateCompletionAsync(prompt);
             //ProcessingMessage(false);
 
             Tokens += result.Usage.TotalTokens;
 
             //Revise plan
-            if (Config.PlanAhead)
+            if (false)
             {
                 await Planner.RevisePlan(UserRequest, StepsPlanned, StepsTaken);
                 SendMessageToUI(Role.System, $"New plan :{String.Join("\n", StepsPlanned)}");
@@ -369,20 +355,38 @@ namespace EVA
         {
             string gptPrompt = $"The following is a prompt for an AI assistant: \"{prompt}\". Please improve and refine the prompt to make it more clear and effective.";
 
-            var result = await OpenAIApi.Chat.CreateChatCompletionAsync(gptPrompt);
+            var result = await OpenAIApi.Completions.CreateCompletionAsync(new CompletionRequest(gptPrompt, model: Model.GPT4, temperature: 0.1));
             Tokens += result.Usage.TotalTokens;
 
-            string refinedPrompt = result.Choices[0].Message.Content;
+            string refinedPrompt = result.Completions[0].Text;
             return refinedPrompt.Trim();
         }
-        public Command DeserializeCommand(string jsonResponse)
+        public async Task<string> SummarizeFilesContent(string filename, string content)
+        {
+            string gptPrompt = $"The file \"{filename}\" contains the following data:\n {content} \n-------------\n Summarize the files content and it's purpose in a few sentences so an AI agent can use this information to work with the files.";
+
+            var result = await OpenAIApi.Chat.CreateChatCompletionAsync(new ChatRequest()
+            {
+                Model = Model.ChatGPTTurbo,
+                Temperature = 0.1,
+                Messages = new ChatMessage[] {
+                    new ChatMessage(ChatMessageRole.System, gptPrompt)
+                }
+            });
+
+            Tokens += result.Usage.TotalTokens;
+
+            return result.Choices[0].Message.Content.Trim();
+
+        }
+        public ICommand DeserializeCommand(string jsonResponse)
         {
             var json = JObject.Parse(jsonResponse);
             var commandName = json["action"]?.ToString();
 
             if (commandName != null && CommandTypes.TryGetValue(commandName, out Type commandType))
             {
-                var command = (Command)System.Text.Json.JsonSerializer.Deserialize(jsonResponse, commandType);
+                var command = (ICommand)System.Text.Json.JsonSerializer.Deserialize(jsonResponse, commandType);
 
                 // Populate CustomProperties
                 foreach (var property in json.Properties())
@@ -425,47 +429,16 @@ namespace EVA
         {
             // ... method body to update PlannedCommands based on user input and intermediate results ...
         }
-        public async Task<List<Memory>> FindSimilarMemoriesAsync(string text)
-        {
-            //var embedding = await OpenAIApi.Embeddings.GetEmbeddingsAsync(UserRequest);
-            var embedding = await CreateEmbeddingVector(text);
-            //FindSimilarMemoriesAsync(embedding);
-            var request = new GraphGetRequest();
-            //request.NearVector = new NearVector() { Vector = embedding };
-            request.Class = "Memory";
-            request.NearVector = new NearVector() { Vector = embedding, Certainty = 0.85f };
-            request.Fields = new Field[] { "summary","text","keywords" };
-            request.Limit = 3;
-            var memorySearch = await Database.Graph.GetAsync(request);
-
-            var memoryResponse = System.Text.Json.JsonSerializer.Deserialize<GraphQLMemoryResponse>(memorySearch.Result.Data);
-
-            
-            return memoryResponse.Get.Memory.ToList();
-
-        }
-        public async Task SaveAsMemoryAsync(string text)
-        {
-            var summary = await CreateSummary(text);
-            var embedding = await OpenAIApi.Embeddings.GetEmbeddingsAsync(summary);
-            var keywords = await GenerateKeywords(text);
-
-            // Serialize Memory object to JSON
-            var obj = new CreateObjectRequest("Memory");
-            obj.Vector = embedding;
-            obj.Properties = new Dictionary<string, object> { { "summary", summary }, { "text", text }, { "keywords" , keywords } };
-            var dbResult = await Database.Data.CreateAsync(obj);
-
-
-        }
+       
             public async Task<List<string>> GenerateKeywords(string text)
         {
 
             string keywordExtractionPrompt = $"Extract the main keywords from the following text and return a comma seperated list only: \"{text}\"";
-            var result = await OpenAIApi.Chat.CreateChatCompletionAsync(keywordExtractionPrompt);
+            var result = await OpenAIApi.Completions.CreateCompletionAsync(new CompletionRequest(keywordExtractionPrompt, model: Model.GPT4, temperature: 0.1));
+
             Tokens += result.Usage.TotalTokens;
 
-            List<string> keywords = result.Choices[0].Message.Content.Split(',').ToList();
+            List<string> keywords = result.Completions[0].Text.Split(',').ToList();
 
             return keywords;
         }
@@ -487,14 +460,5 @@ namespace EVA
             return embedding;
         }
 
-         public class GraphQLMemoryResponse
-        {
-            public GetObject Get { get; set; }
-
-            public class GetObject
-            {
-                public Memory[] Memory { get; set; }
-            }
-        }
     }
 }

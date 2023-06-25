@@ -30,7 +30,7 @@ using System.Threading.Tasks;
 
 namespace EVA.Commands
 {
-    public class VoiceOutputCommand : Command
+    public class VoiceOutputCommand : ICommand
     {
         public string Text
         {

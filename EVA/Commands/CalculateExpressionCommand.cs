@@ -30,7 +30,7 @@ using System.Threading.Tasks;
 
 namespace EVA.Commands
 {
-    public class CalculateExpressionCommand : Command
+    public class CalculateExpressionCommand : ICommand
     {
         public string Expression
         {
