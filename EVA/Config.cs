@@ -38,6 +38,11 @@ namespace EVA
 
     public class Config
     {
+        [JsonProperty("openai_endpoint")]
+        [IncludeInConfig]
+        [Description("OpenAI API Endpoint.")]
+        public string OpenAIEndpoint { get; set; }
+
         [JsonProperty("openai_access_token")]
         [IncludeInConfig]
         [Description("Your OpenAI API access token.")]
@@ -93,6 +98,7 @@ namespace EVA
         public Config()
         {
             OpenAIAccessToken = "your_default_openai_access_token";
+            OpenAIEndpoint = "";
             RefinePromptsWithGPT = false;
             PlanAhead = false;
             UseMemory = false;
