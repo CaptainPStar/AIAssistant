@@ -31,7 +31,7 @@ using System.Threading.Tasks;
 namespace EVA.Commands
 {
 
-    public class WriteLocalFileCommand : Command
+    public class WriteLocalFileCommand : ICommand
     {
         public string FilePath
         {

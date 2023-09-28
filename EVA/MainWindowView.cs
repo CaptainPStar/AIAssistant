@@ -1,4 +1,5 @@
-﻿using System;
+﻿using EVA.Commands;
+using System;
 using System.Collections.Generic;
 using System.Collections.ObjectModel;
 using System.ComponentModel;
@@ -31,7 +32,7 @@ namespace EVA
                 PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(UserRequest)));
             }
         }
-
+        public ObservableCollection<CommandViewModel> Commands { get; set; }
         public AgentContext AgentContext { get; private set; }
 
         public MainWindowView(AgentContext agentContext)
@@ -40,6 +41,22 @@ namespace EVA
 
             //Give the AgentContext the callback to add chat messages to the UI
             agentContext.MessageReceivedCallback += AddMessage;
+
+                Commands = new ObservableCollection<CommandViewModel>();
+
+                // Load available commands/functions from the CommandFactory
+                LoadCommands();
+            }
+
+        private void LoadCommands()
+        {
+                // Use CommandFactory to get available commands/functions
+                var availableCommands = AgentContext.CommandFactory.GetAvailableCommands();
+
+            foreach (var command in availableCommands)
+            {
+                Commands.Add(new CommandViewModel { Name = command.Item1, IsEnabled = command.Item2, Description = "Description here" });
+            }
         }
         public void OnMessageReceived(Role role, string message)
         {

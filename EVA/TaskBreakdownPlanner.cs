@@ -1,5 +1,4 @@
-﻿using Google.Protobuf.WellKnownTypes;
-using OpenAI_API;
+﻿using OpenAI_API;
 using OpenAI_API.Moderation;
 using System;
 using System.Collections.Generic;

@@ -32,16 +32,16 @@ using static System.Net.Mime.MediaTypeNames;
 
 namespace EVA.Commands
 {
-    public  class AskUserCommand : Command
+    public  class AskUserCommand : ICommand
     {
         public string Question
         {
-            get => CustomProperties.ContainsKey("question") ? CustomProperties["question"].ToString() : null;
-            set => CustomProperties["question"] = value;
+            get => CustomProperties.ContainsKey("Question") ? CustomProperties["Question"].ToString() : null;
+            set => CustomProperties["Question"] = value;
         }
         public AskUserCommand()
         {
-            CommandName = "ask";
+            CommandName = "AskUser";
             Description = "This command can be used to ask the user a question or request additional info which is then added to the conversation";
             Question = "A request for additional input from the user.";
         }

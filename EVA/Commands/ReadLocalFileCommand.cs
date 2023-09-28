@@ -30,7 +30,7 @@ using System.Threading.Tasks;
 
 namespace EVA.Commands
 {
-    public class ReadLocalFileCommand : Command
+    public class ReadLocalFileCommand : ICommand
     {
         public string FilePath
         {

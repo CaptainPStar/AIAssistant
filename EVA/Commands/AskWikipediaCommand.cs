@@ -32,23 +32,23 @@ using System.Threading.Tasks;
 
 namespace EVA.Commands
 {
-    public class AskWikipediaCommand : Command
+    public class AskWikipediaCommand : ICommand
     {
 
         public string SearchTopic
         {
-            get => CustomProperties.ContainsKey("searchtopic") ? CustomProperties["searchtopic"].ToString() : null;
-            set => CustomProperties["searchtopic"] = value;
+            get => CustomProperties.ContainsKey("SearchTopic") ? CustomProperties["SearchTopic"].ToString() : null;
+            set => CustomProperties["SearchTopic"] = value;
         }
         public string Language
         {
-            get => CustomProperties.ContainsKey("language") ? CustomProperties["language"].ToString() : null;
-            set => CustomProperties["language"] = value;
+            get => CustomProperties.ContainsKey("Language") ? CustomProperties["Language"].ToString() : null;
+            set => CustomProperties["Language"] = value;
         }
         public AskWikipediaCommand()
         {
             CommandName = "askWikipedia";
-            Description = "Search Wikipedia for \"SearchTopic\" and grab the first few sentences";
+            Description = "Get a short description of \"SearchTopic\" from Wikipedia. For longer content the function to get text from a website (if available) should be used.";
             SearchTopic = "Text or topic to search on Wikipedia";
             Language = "Which languages wikipedia should be asked? Value should be wikipedia subdomain, e.g. \"en\", \"de\", \"ru\",...";
         }
