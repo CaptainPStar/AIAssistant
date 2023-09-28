@@ -51,7 +51,7 @@ namespace EVA
         private void LoadCommands()
         {
                 // Use CommandFactory to get available commands/functions
-                var availableCommands = AgentContext.CommandFactory.GetAvailableCommands();
+                var availableCommands = AgentContext.Commands.GetAvailableCommands();
 
             foreach (var command in availableCommands)
             {

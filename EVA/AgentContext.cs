@@ -15,18 +15,10 @@ using System.Collections.Concurrent;
 using System.Security.Authentication;
 using System.Diagnostics;
 using System.IO;
-using IO.Milvus.Client;
-using Flurl.Http;
-using SearchPioneer.Weaviate.Client;
 using Newtonsoft.Json;
 using Newtonsoft.Json.Serialization;
-using EVA.Weaviate;
-using Flurl.Http.Configuration;
 using System.Globalization;
-using GraphQL.Client.Http;
-using GraphQL.Client.Abstractions;
 using System.Data;
-using GraphQL;
 using System.Net.Http.Headers;
 using System.Net.Http;
 using ControlzEx.Standard;
@@ -55,11 +47,10 @@ namespace EVA
         public List<string> StepsTaken { get; private set; } = new List<string>();
         public List<string> StepsPlanned { get; private set; } = new List<string>();
         private TaskBreakdownPlanner Planner { get; set; }
-        public List<Command> PlannedCommands { get; private set; } = new List<Command>();
-        public WeaviateClient Database { private set; get; } = null;
+        public List<ICommand> PlannedCommands { get; private set; } = new List<ICommand>();
         public List<string> AbilitiesPrompt { get; set; } = new List<string>();
         public string UserRequest { set; get; } = string.Empty;
-
+        public CommandFactory Commands = new CommandFactory();
         private static readonly NLog.Logger Logger = NLog.LogManager.GetCurrentClassLogger();
 
         public string Cost
@@ -114,7 +105,7 @@ namespace EVA
             //CommandTypes.Add((new VoiceOutputCommand()).CommandName, typeof(VoiceOutputCommand));
             if (Config.UseFileIO)
             {
-                CommandTypes.Add((new ListLocalFilesCommand()).CommandName, typeof(ListLocalFilesCommand));
+                CommandTypes.Add((new ListFilesCommand()).CommandName, typeof(ListFilesCommand));
                 CommandTypes.Add((new ReadLocalFileCommand()).CommandName, typeof(ReadLocalFileCommand));
                 CommandTypes.Add((new WriteLocalFileCommand()).CommandName, typeof(WriteLocalFileCommand));
             }
@@ -126,7 +117,7 @@ namespace EVA
 
             foreach (var a in CommandTypes)
             {
-                var cmd = (Command)Activator.CreateInstance(a.Value);
+                var cmd = (ICommand)Activator.CreateInstance(a.Value);
                 AbilitiesPrompt.Add(cmd.Description + ": " + cmd.GetPrompt());
             }
 
@@ -142,18 +133,6 @@ namespace EVA
         }
         public async Task HandleUserRequestAsync(string userRequest)
         {
-            if (Config.UseMemory && Database == null)
-            {
-                SendMessageToUI(Role.System, "Using Memory-Feature. Spinning up Weaviate Vector Database...");
-                var flurlClient = new FlurlClient();
-                Database = new WeaviateClient(new SearchPioneer.Weaviate.Client.Config("http", "localhost:8080"), flurlClient);
-                var meta = Database.Misc.Meta();
-                //Console.WriteLine(meta.Error != null ? meta.Error.Message : meta.Result.Version);
-                string weaviateVersion = meta.Error != null ? meta.Error.Message : meta.Result.Version;
-                SendMessageToUI(Role.System, $"Weaviate Version {weaviateVersion} found.");
-               
-
-            }
             //We are already processing a request so this is additional info from the user
             if (!string.IsNullOrEmpty(UserRequest))
             {
@@ -186,7 +165,7 @@ namespace EVA
             }
 
             // Deserialize the command
-            Command command = null;
+            ICommand command = null;
             try
             {
                 command = DeserializeCommand(jsonResponse);
@@ -258,44 +237,11 @@ namespace EVA
             string prompt = "";
             prompt = "As part of an AI assistant it is your task to selects the most appropriate programmatic command from a list of possible commands based on a useriput and the AIs steps to solve the task so far. Depending on the command fill in all the necessary parameters of the command based on the userinput.";
          
-
-            if (Config.UseMemory)
-            {
-                prompt += "You are also assistent by a persistent memory that might recall earlier UserRequests and the processed responses.\n";
-            }
-                prompt += "Available commands and abilities:" + "\n";
-                prompt += String.Join('\n', AbilitiesPrompt) + "\n"; ;
-                prompt += "Respond only in the JSON format that can be parsed with JSON.parse of the selected action. Only use actions from the provided list! Fill in the template \"{\"action\":\"NameofActionfromList\",... other parameter specified in the list based on the useriput}\"";
+            prompt += "Available commands and abilities:" + "\n";
+            prompt += String.Join('\n', AbilitiesPrompt) + "\n"; ;
+            prompt += "Respond only in the JSON format that can be parsed with JSON.parse of the selected action. Only use actions from the provided list! Fill in the template \"{\"action\":\"NameofActionfromList\",... other parameter specified in the list based on the useriput}\"";
 
             prompt += $"User request:\n\"{UserRequest}\"\n";
-
-            if (Config.UseMemory)
-            {
-                // Create a Memory object
-
-                string memoryLookup = "";
-                memoryLookup += $"Original user Request: {UserRequest}\n";
-                memoryLookup += $"Steps taken by AI assistant:";
-                foreach(var s in StepsTaken)
-                {
-                    memoryLookup += $"{s}\n";
-                }
-                var mems = await FindSimilarMemoriesAsync(memoryLookup);
-                if(mems.Count > 0)
-                {
-                    prompt += $"You remember {mems.Count} information from earlier tasks and conversations:";
-                    int c = 1;
-                    foreach (var m in mems)
-                    {
-                        prompt += $"Memory {c}:\nKeywords: {String.Join(", ", m.Keywords)}\nSummary: {m.Summary}\nText: {m.Text}\n\n";
-                        c++;
-
-                    }
-                    prompt += "If this information already answers the users input, give the final answer to the user.";
-                }
-
-                //var r = result.Result.Data;
-            }
 
             if (Config.PlanAhead)
             {
@@ -375,14 +321,14 @@ namespace EVA
             string refinedPrompt = result.Choices[0].Message.Content;
             return refinedPrompt.Trim();
         }
-        public Command DeserializeCommand(string jsonResponse)
+        public ICommand DeserializeCommand(string jsonResponse)
         {
             var json = JObject.Parse(jsonResponse);
             var commandName = json["action"]?.ToString();
 
             if (commandName != null && CommandTypes.TryGetValue(commandName, out Type commandType))
             {
-                var command = (Command)System.Text.Json.JsonSerializer.Deserialize(jsonResponse, commandType);
+                var command = (ICommand)System.Text.Json.JsonSerializer.Deserialize(jsonResponse, commandType);
 
                 // Populate CustomProperties
                 foreach (var property in json.Properties())
@@ -425,39 +371,6 @@ namespace EVA
         {
             // ... method body to update PlannedCommands based on user input and intermediate results ...
         }
-        public async Task<List<Memory>> FindSimilarMemoriesAsync(string text)
-        {
-            //var embedding = await OpenAIApi.Embeddings.GetEmbeddingsAsync(UserRequest);
-            var embedding = await CreateEmbeddingVector(text);
-            //FindSimilarMemoriesAsync(embedding);
-            var request = new GraphGetRequest();
-            //request.NearVector = new NearVector() { Vector = embedding };
-            request.Class = "Memory";
-            request.NearVector = new NearVector() { Vector = embedding, Certainty = 0.85f };
-            request.Fields = new Field[] { "summary","text","keywords" };
-            request.Limit = 3;
-            var memorySearch = await Database.Graph.GetAsync(request);
-
-            var memoryResponse = System.Text.Json.JsonSerializer.Deserialize<GraphQLMemoryResponse>(memorySearch.Result.Data);
-
-            
-            return memoryResponse.Get.Memory.ToList();
-
-        }
-        public async Task SaveAsMemoryAsync(string text)
-        {
-            var summary = await CreateSummary(text);
-            var embedding = await OpenAIApi.Embeddings.GetEmbeddingsAsync(summary);
-            var keywords = await GenerateKeywords(text);
-
-            // Serialize Memory object to JSON
-            var obj = new CreateObjectRequest("Memory");
-            obj.Vector = embedding;
-            obj.Properties = new Dictionary<string, object> { { "summary", summary }, { "text", text }, { "keywords" , keywords } };
-            var dbResult = await Database.Data.CreateAsync(obj);
-
-
-        }
             public async Task<List<string>> GenerateKeywords(string text)
         {
 
@@ -485,16 +398,6 @@ namespace EVA
             string extractionPrompt = await CreateSummary(text);
             var embedding = await OpenAIApi.Embeddings.GetEmbeddingsAsync(extractionPrompt);
             return embedding;
-        }
-
-         public class GraphQLMemoryResponse
-        {
-            public GetObject Get { get; set; }
-
-            public class GetObject
-            {
-                public Memory[] Memory { get; set; }
-            }
         }
     }
 }
